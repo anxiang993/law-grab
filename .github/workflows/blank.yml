@@ -1,36 +1,27 @@
-# This is a basic workflow to help you get started with Actions
-
-name: CI
-
-# Controls when the workflow will run
+name: Law_Sync_Bot
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  schedule:
+    - cron: '0 0 * * *' # 每天早上8点自动运行
+  workflow_dispatch:   # 允许你手动点击按钮运行
 
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
-
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+  run_bot:
     runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
-
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
-
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+      - name: 检查代码
+        uses: actions/checkout@v3
+      - name: 安装Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: 安装依赖
+        run: pip install requests beautifulsoup4
+      - name: 执行抓取
+        run: python monitor.py
+      - name: 保存文件回仓库
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+          git config --global user.name "LawBot"
+          git config --global user.email "bot@github.com"
+          git add .
+          git commit -m "自动更新法规库" || exit 0
+          git push
