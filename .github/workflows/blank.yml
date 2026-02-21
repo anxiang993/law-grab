@@ -1,32 +1,36 @@
 name: Law_Sync_Bot
 
+# 核心：增加写入权限
+permissions:
+  contents: write
+
 on:
-  workflow_dispatch: # 允许手动点击运行
+  workflow_dispatch:
   schedule:
-    - cron: '0 0 * * *' # 每天自动运行
+    - cron: '0 0 * * *'
 
 jobs:
   run_bot:
     runs-on: ubuntu-latest
     steps:
-      - name: 1. 拉取代码
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: 2. 安装 Python 环境
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
-      - name: 3. 安装必要的依赖库 (修复报错的关键)
+      - name: Install dependencies
         run: pip install requests beautifulsoup4
 
-      - name: 4. 执行抓取脚本
+      - name: Run Monitor
         run: python monitor.py
 
-      - name: 5. 将抓取到的文件存回仓库
+      - name: Commit and Push
         run: |
-          git config --global user.name "LawBot"
-          git config --global user.email "bot@github.com"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "自动更新法规库" || exit 0
-          git push
+          git commit -m "Auto-update laws" || exit 0
+          git push origin main
