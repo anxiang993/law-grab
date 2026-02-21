@@ -1,24 +1,29 @@
 name: Law_Sync_Bot
+
 on:
+  workflow_dispatch: # 允许手动点击运行
   schedule:
-    - cron: '0 0 * * *' # 每天早上8点自动运行
-  workflow_dispatch:   # 允许你手动点击按钮运行
+    - cron: '0 0 * * *' # 每天自动运行
 
 jobs:
   run_bot:
     runs-on: ubuntu-latest
     steps:
-      - name: 检查代码
+      - name: 1. 拉取代码
         uses: actions/checkout@v3
-      - name: 安装Python
+
+      - name: 2. 安装 Python 环境
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-      - name: 安装依赖
+
+      - name: 3. 安装必要的依赖库 (修复报错的关键)
         run: pip install requests beautifulsoup4
-      - name: 执行抓取
+
+      - name: 4. 执行抓取脚本
         run: python monitor.py
-      - name: 保存文件回仓库
+
+      - name: 5. 将抓取到的文件存回仓库
         run: |
           git config --global user.name "LawBot"
           git config --global user.email "bot@github.com"
