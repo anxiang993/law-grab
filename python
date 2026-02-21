@@ -1,0 +1,84 @@
+import requests
+from bs4 import BeautifulSoup
+import re
+import os
+import time
+
+# --- 配置区 ---
+DATA_DIR = "./integrated_laws"  # 整合后的库路径
+HISTORY_FILE = "processed_links.txt"
+os.makedirs(DATA_DIR, exist_ok=True)
+
+HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+
+# --- 核心逻辑 1：识别“母法”名称 ---
+def get_base_law_name(title):
+    # 优先匹配书名号，如《中华人民共和国公司法》-> 中华人民共和国公司法
+    match = re.search(r'《([^》]+)》', title)
+    if match:
+        name = match.group(1)
+        # 进一步精简：去除“关于适用...的解释”中的干扰，提取核心法律
+        core_match = re.search(r'关于适用(.+?)的', name)
+        return core_match.group(1) if core_match else name
+    # 如果没书名号，提取前几个字作为关键词（如：中共中央国务院关于...）
+    return re.sub(r'关于|的通知|的意见|的公告', '', title)[:15]
+
+# --- 核心逻辑 2：抓取全文 ---
+def fetch_full_text(url):
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=15)
+        resp.encoding = 'utf-8'
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        # 兼容政府网和最高法的正文标签
+        body = soup.select_one('#p_content') or soup.select_one('.pages_content') or soup.select_one('.txt_con')
+        return body.get_text(separator="\n\n").strip() if body else "无法抓取正文，请查阅原链接。"
+    except:
+        return "抓取异常。"
+
+# --- 核心逻辑 3：整合合并 ---
+def integrate_content(law_item):
+    base_name = get_base_law_name(law_item['title'])
+    file_path = os.path.join(DATA_DIR, f"{base_name}.md")
+    
+    # 识别废止信号
+    if any(kw in law_item['title'] for kw in ["废止", "失效"]):
+        if os.path.exists(file_path):
+            os.rename(file_path, file_path + ".bak_废止") # 改名备份而非直接删除，更安全
+            print(f"🚫 检测到废止信号，已归档旧法: {base_name}")
+            return
+
+    full_text = fetch_full_text(law_item['link'])
+    
+    # 准备新区块
+    new_section = f"\n\n## [{law_item['date']}] {law_item['category']}: {law_item['title']}\n"
+    new_section += f"原文链接: {law_item['link']}\n\n"
+    new_section += f"{full_text}\n"
+    new_section += "\n---\n"
+
+    if os.path.exists(file_path):
+        with open(file_path, 'r', encoding='utf-8') as f:
+            old_content = f.read()
+        
+        # 如果是“解释”或“办法”，追加在后面；如果是新的“法律”，置顶并折叠旧版
+        if "解释" in law_item['title'] or "实施" in law_item['title']:
+            final_content = old_content + new_section
+        else:
+            final_content = f"# {base_name} 集成库\n" + new_section + "\n\n### 历史版本及关联文件\n<details>\n" + old_content + "\n</details>"
+    else:
+        final_content = f"# {base_name} 集成库\n" + new_section
+
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write(final_content)
+
+# --- 抓取入口 (简化演示) ---
+def main():
+    # 这里接入之前写好的 fetch_data() 函数获取列表
+    # 模拟一条新数据
+    sample_news = [
+        {'title': '关于适用《中华人民共和国公司法》时间效力若干问题的规定', 'date': '2024-07-01', 'link': '...', 'category': '司法解释'}
+    ]
+    for item in sample_news:
+        integrate_content(item)
+
+if __name__ == "__main__":
+    main()
